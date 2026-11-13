@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js WebGL Foundation</title>
+    <meta name="description" content="Foundational boilerplate for a Three.js 3D web application with scene, perspective camera, WebGLRenderer, animation loop, and resize handling." />
+    <meta property="og:title" content="Three.js WebGL Foundation" />
+    <meta property="og:description" content="Foundational boilerplate for a Three.js 3D web application with scene, perspective camera, WebGLRenderer, animation loop, and resize handling." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        user-select: none;
+      }
+      .time-control-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(10, 10, 15, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 6px 14px;
+        opacity: 0.2;
+        transition: opacity 0.3s ease;
+        z-index: 10;
+      }
+      .time-control-container:hover {
+        opacity: 1.0;
+      }
+      .time-control-container span {
+        font-size: 16px;
+        line-height: 1;
+        cursor: default;
+      }
+      .time-slider {
+        cursor: pointer;
+        accent-color: #ffcc00;
+        width: 110px;
+      }
+      /* Minimalist Spacesuit HUD */
+      .suit-hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(130, 210, 255, 0.3);
+        border-radius: 6px;
+        padding: 10px 16px;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 13px;
+        color: #e2f3ff;
+        letter-spacing: 0.8px;
+        pointer-events: none;
+        z-index: 10;
+      }
+      /* Full-Screen Game Over UI */
+      #game-over-screen {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000000;
+        z-index: 100;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #ff4444;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: clamp(22px, 4vw, 38px);
+        font-weight: bold;
+        letter-spacing: 2px;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      /* Full-Screen Mission Success UI */
+      #success-screen {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000000;
+        z-index: 100;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #00ff66;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: clamp(22px, 4vw, 38px);
+        font-weight: bold;
+        letter-spacing: 2px;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      /* Minimalist Start Screen */
+      #start-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 200;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        box-sizing: border-box;
+      }
+      #start-screen h1 {
+        margin: 0 0 10px 0;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: clamp(22px, 4vw, 36px);
+        font-weight: 700;
+        letter-spacing: 4px;
+        color: #ffffff;
+        text-transform: uppercase;
+        text-align: center;
+      }
+      .start-menu-btn {
+        background: transparent;
+        color: #ffffff;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 15px;
+        letter-spacing: 1.5px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 4px;
+        padding: 14px 28px;
+        cursor: pointer;
+        width: 280px;
+        max-width: 90vw;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+      .start-menu-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: #ffffff;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.25);
+        transform: translateY(-1px);
+      }
+      .start-menu-btn:active {
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Minimalist Start Screen -->
+    <div id="start-screen">
+      <h1>SELECT LANDING SITE</h1>
+      <button id="site-a-btn" class="start-menu-btn">Site A: Flat Plains</button>
+      <button id="site-b-btn" class="start-menu-btn">Site B: Deep Crater</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen">MISSION FAILED: SUIT POWER DEPLETED</div>
+
+    <!-- Mission Success Screen -->
+    <div id="success-screen">MISSION SUCCESS: OPTIMAL LANDING SITE SECURED</div>
+
+    <!-- Spacesuit Metrics HUD -->
+    <div class="suit-hud">
+      <div id="battery-display">Battery: 100%</div>
+      <div id="signal-display">Signal: Strong</div>
+    </div>
+
+    <!-- Minimalist Sun Arc Slider Overlay -->
+    <div class="time-control-container">
+      <span title="Time of Day">☀️</span>
+      <input type="range" id="timeSlider" class="time-slider" min="0" max="100" value="50" title="Sun Position">
+    </div>
+    <script type="module">
+      import * as THREE from 'https://esm.sh/three';
+      import { OrbitControls } from 'https://esm.sh/three/addons/controls/OrbitControls.js';
+
+      // 1. Initialize Scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#000000');
+
+      // 1b. The Earth in the Sky
+      const earthGeometry = new THREE.SphereGeometry(25, 48, 48);
+      const earthMaterial = new THREE.MeshStandardMaterial({
+        color: '#1e90ff',
+        roughness: 0.6,
+        metalness: 0.1,
+        emissive: '#0d47a1',
+        emissiveIntensity: 0.35,
+      });
+      const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+      earth.position.set(-200, 150, -300);
+      scene.add(earth);
+      const earthMesh = earth;
+
+      // 2. Procedural Starfield (deep space)
+      const starCount = 3000;
+      const starPositions = new Float32Array(starCount * 3);
+
+      for (let i = 0; i < starCount * 3; i += 3) {
+        starPositions[i] = (Math.random() - 0.5) * 1000;     // x: -500 to 500
+        starPositions[i + 1] = (Math.random() - 0.5) * 1000; // y: -500 to 500
+        starPositions[i + 2] = (Math.random() - 0.5) * 1000; // z: -500 to 500
+      }
+
+      const starGeometry = new THREE.BufferGeometry();
+      starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+
+      const starMaterial = new THREE.PointsMaterial({
+        color: '#ffffff',
+        size: 1.2,
+        sizeAttenuation: true,
+      });
+
+      const starfield = new THREE.Points(starGeometry, starMaterial);
+      scene.add(starfield);
+
+      // 3. Lunar Surface with Procedural Craters & Vertex Displacement
+      const groundGeometry = new THREE.PlaneGeometry(500, 500, 150, 150);
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        color: '#555555',
+        roughness: 0.8,
+      });
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      ground.castShadow = true;
+      scene.add(ground);
+      const terrainMesh = ground;
+
+      // Defined procedural crater anchors (center x, y, radius, depth)
+      const craters = [
+        { cx: 0, cy: -15, r: 28, depth: 7 },
+        { cx: 45, cy: 30, r: 20, depth: 5 },
+        { cx: -50, cy: 20, r: 24, depth: 6 },
+        { cx: 80, cy: -40, r: 35, depth: 8 },
+        { cx: -80, cy: -50, r: 30, depth: 7 },
+        { cx: 120, cy: 60, r: 40, depth: 9 },
+        { cx: -130, cy: 70, r: 45, depth: 10 },
+      ];
+
+      function generateTerrain(bumpinessScale) {
+        const pos = terrainMesh.geometry.attributes.position;
+
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const y = pos.getY(i);
+
+          // Multi-frequency rolling hills and ridges
+          let z = Math.sin(x * 0.015) * Math.cos(y * 0.015) * 6;
+          z += Math.sin(x * 0.035 + 1.2) * Math.cos(y * 0.028) * 3;
+          z += Math.sin(x * 0.08 + y * 0.06) * 1.2;
+          z += Math.cos(x * 0.15) * Math.sin(y * 0.12) * 0.4;
+
+          // Procedural crater dips and elevated rims
+          for (let c = 0; c < craters.length; c++) {
+            const crater = craters[c];
+            const dx = x - crater.cx;
+            const dy = y - crater.cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < crater.r * 1.5) {
+              const normDist = dist / crater.r;
+              if (normDist < 1.0) {
+                // Bowl-shaped crater floor
+                z -= Math.cos(normDist * Math.PI * 0.5) * crater.depth;
+              } else {
+                // Raised impact rim
+                const rimNorm = (normDist - 1.0) / 0.5;
+                z += Math.sin(rimNorm * Math.PI) * (crater.depth * 0.35);
+              }
+            }
+          }
+
+          // Apply bumpiness scale
+          z *= bumpinessScale;
+
+          pos.setZ(i, z);
+        }
+
+        terrainMesh.geometry.attributes.position.needsUpdate = true;
+        terrainMesh.geometry.computeVertexNormals();
+      }
+
+      // Initial terrain default generation
+      generateTerrain(1.0);
+
+      // 4. Detailed Astronaut Character (Compound THREE.Group)
+      const astronaut = new THREE.Group();
+
+      // Materials
+      const suitMaterial = new THREE.MeshStandardMaterial({
+        color: '#f4f4f4',
+        roughness: 0.6,
+        metalness: 0.1,
+      });
+
+      const visorMaterial = new THREE.MeshStandardMaterial({
+        color: '#ffcc00',
+        metalness: 1.0,
+        roughness: 0.1,
+      });
+
+      const backpackMaterial = new THREE.MeshStandardMaterial({
+        color: '#44444a',
+        roughness: 0.7,
+        metalness: 0.2,
+      });
+
+      const darkJointMaterial = new THREE.MeshStandardMaterial({
+        color: '#2a2a30',
+        roughness: 0.8,
+      });
+
+      // Torso
+      const torsoGeometry = new THREE.CylinderGeometry(0.48, 0.42, 0.95, 20);
+      const torso = new THREE.Mesh(torsoGeometry, suitMaterial);
+      torso.position.y = 1.35;
+      astronaut.add(torso);
+
+      // Chest Control Unit (front of spacesuit)
+      const chestPack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.35, 0.28, 0.14),
+        backpackMaterial
+      );
+      chestPack.position.set(0, 1.45, -0.28);
+      astronaut.add(chestPack);
+
+      // Helmet
+      const helmet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 24, 24),
+        suitMaterial
+      );
+      helmet.position.set(0, 2.05, 0);
+      astronaut.add(helmet);
+
+      // Gold Reflective Visor (flattened sphere intersecting front of helmet at -Z)
+      const visor = new THREE.Mesh(
+        new THREE.SphereGeometry(0.35, 24, 24),
+        visorMaterial
+      );
+      visor.scale.set(1.0, 0.75, 0.65);
+      visor.position.set(0, 2.05, -0.22);
+      astronaut.add(visor);
+
+      // Life Support Backpack (PLSS) on the back of suit at +Z
+      const plssBackpack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.68, 0.95, 0.38),
+        backpackMaterial
+      );
+      plssBackpack.position.set(0, 1.42, 0.32);
+      astronaut.add(plssBackpack);
+
+      // Oxygen cylinders on backpack
+      const tankGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.7, 16);
+      const tankLeft = new THREE.Mesh(tankGeo, darkJointMaterial);
+      tankLeft.position.set(-0.2, 1.45, 0.48);
+      const tankRight = new THREE.Mesh(tankGeo, darkJointMaterial);
+      tankRight.position.set(0.2, 1.45, 0.48);
+      astronaut.add(tankLeft, tankRight);
+
+      // Left Leg & Boot
+      const legGeo = new THREE.CylinderGeometry(0.18, 0.16, 0.85, 16);
+      const leftLeg = new THREE.Mesh(legGeo, suitMaterial);
+      leftLeg.position.set(-0.25, 0.65, 0);
+      const bootGeo = new THREE.BoxGeometry(0.24, 0.22, 0.38);
+      const leftBoot = new THREE.Mesh(bootGeo, darkJointMaterial);
+      leftBoot.position.set(-0.25, 0.11, -0.06);
+      astronaut.add(leftLeg, leftBoot);
+
+      // Right Leg & Boot
+      const rightLeg = new THREE.Mesh(legGeo, suitMaterial);
+      rightLeg.position.set(0.25, 0.65, 0);
+      const rightBoot = new THREE.Mesh(bootGeo, darkJointMaterial);
+      rightBoot.position.set(0.25, 0.11, -0.06);
+      astronaut.add(rightLeg, rightBoot);
+
+      // Left Arm & Glove
+      const armGeo = new THREE.CylinderGeometry(0.15, 0.13, 0.75, 16);
+      const leftArm = new THREE.Mesh(armGeo, suitMaterial);
+      leftArm.position.set(-0.62, 1.35, 0);
+      leftArm.rotation.z = Math.PI * 0.08;
+      const gloveGeo = new THREE.SphereGeometry(0.14, 16, 16);
+      const leftGlove = new THREE.Mesh(gloveGeo, darkJointMaterial);
+      leftGlove.position.set(-0.68, 0.92, 0);
+      astronaut.add(leftArm, leftGlove);
+
+      // Right Arm & Glove
+      const rightArm = new THREE.Mesh(armGeo, suitMaterial);
+      rightArm.position.set(0.62, 1.35, 0);
+      rightArm.rotation.z = -Math.PI * 0.08;
+      const rightGlove = new THREE.Mesh(gloveGeo, darkJointMaterial);
+      rightGlove.position.set(0.68, 0.92, 0);
+      astronaut.add(rightArm, rightGlove);
+
+      // Enable castShadow and receiveShadow on every child mesh of the astronaut
+      astronaut.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      scene.add(astronaut);
+
+      // 5. Lighting & The Sun
+      const ambientLight = new THREE.AmbientLight('#ffffff', 0.25);
+      scene.add(ambientLight);
+
+      // Create the Sun (DirectionalLight)
+      const sunLight = new THREE.DirectionalLight('#ffffff', 2.0);
+      sunLight.position.set(100, 100, 50);
+      sunLight.castShadow = true;
+
+      // Expand shadow camera frustum for the large terrain
+      sunLight.shadow.camera.left = -200;
+      sunLight.shadow.camera.right = 200;
+      sunLight.shadow.camera.top = 200;
+      sunLight.shadow.camera.bottom = -200;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 500;
+
+      // High shadow resolution for crisp, distinct black shadows
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.bias = -0.0005;
+
+      scene.add(sunLight);
+      scene.add(sunLight.target);
+
+      // Minimalist Time of Day Control (Sun Arc Calculation anchored to astronaut)
+      const timeSlider = document.getElementById('timeSlider');
+      const sunRadius = 200;
+
+      function updateSunPosition() {
+        const percent = parseFloat(timeSlider.value) / 100;
+        // Map 0 -> 100 to angle 0 -> Math.PI (sunrise across the sky to sunset)
+        const angle = percent * Math.PI;
+        // Position Sun relative to astronaut's current position so shadows never clip or vanish
+        sunLight.position.set(
+          astronaut.position.x + Math.cos(angle) * sunRadius,
+          astronaut.position.y + Math.sin(angle) * sunRadius,
+          astronaut.position.z + 50
+        );
+        sunLight.target.position.copy(astronaut.position);
+        // Force immediate recalculation of shadow projection matrices
+        sunLight.updateMatrixWorld();
+        sunLight.target.updateMatrixWorld();
+      }
+
+      timeSlider.addEventListener('input', () => {
+        updateSunPosition();
+      });
+      updateSunPosition();
+
+      // 6. Camera Setup & Renderer Initialization
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1500
+      );
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.autoUpdate = true;
+      document.body.appendChild(renderer.domElement);
+
+      // OrbitControls for Free Camera exploration
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enabled = false;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Camera Follow Target Vectors
+      const cameraOffset = new THREE.Vector3(0, 3, 6);
+      const idealTargetPosition = new THREE.Vector3();
+
+      // Terrain Grounding Raycaster & Clock Setup
+      const raycaster = new THREE.Raycaster();
+      const downVector = new THREE.Vector3(0, -1, 0);
+      const rayOrigin = new THREE.Vector3();
+
+      // Framerate-independent clock & Lunar Jump Physics
+      const clock = new THREE.Clock();
+      let yVelocity = 0;
+      let isJumping = false;
+      const LUNAR_GRAVITY = 5.0;
+      const JUMP_STRENGTH = 5.0;
+
+      // Suit Power & Survival State
+      let battery = 100.0;
+      let isGameOver = false;
+      let isWireframe = false;
+      let isGameStarted = false;
+
+      const gameOverScreen = document.getElementById('game-over-screen');
+      const successScreen = document.getElementById('success-screen');
+      const startScreen = document.getElementById('start-screen');
+      const siteABtn = document.getElementById('site-a-btn');
+      const siteBBtn = document.getElementById('site-b-btn');
+      const batteryDisplay = document.getElementById('battery-display');
+      const signalDisplay = document.getElementById('signal-display');
+
+      const sunRaycaster = new THREE.Raycaster();
+      sunRaycaster.near = 0.2; // Prevent self-intersection with the immediate ground under feet
+      const sunDirection = new THREE.Vector3();
+      const earthRaycaster = new THREE.Raycaster();
+      earthRaycaster.near = 0.2; // Prevent self-intersection with the immediate ground under feet
+      const earthDirection = new THREE.Vector3();
+
+      // Place astronaut safely on terrain
+      function placeAstronautSafely() {
+        rayOrigin.set(astronaut.position.x, 250, astronaut.position.z);
+        raycaster.set(rayOrigin, downVector);
+        const startHits = raycaster.intersectObject(terrainMesh);
+        const startY = startHits.length > 0 ? startHits[0].point.y : 0;
+        astronaut.position.set(0, startY, 0);
+        yVelocity = 0;
+        isJumping = false;
+        // Snap camera behind astronaut immediately
+        idealTargetPosition
+          .copy(cameraOffset)
+          .applyQuaternion(astronaut.quaternion)
+          .add(astronaut.position);
+        camera.position.copy(idealTargetPosition);
+        camera.lookAt(astronaut.position);
+      }
+
+      // Initial astronaut placement
+      placeAstronautSafely();
+
+      // Start Menu Button Listeners
+      if (siteABtn) {
+        siteABtn.addEventListener('click', () => {
+          generateTerrain(0.5);
+          placeAstronautSafely();
+          if (startScreen) {
+            startScreen.style.display = 'none';
+          }
+          isGameStarted = true;
+          clock.start();
+        });
+      }
+
+      if (siteBBtn) {
+        siteBBtn.addEventListener('click', () => {
+          generateTerrain(5.0);
+          placeAstronautSafely();
+          if (startScreen) {
+            startScreen.style.display = 'none';
+          }
+          isGameStarted = true;
+          clock.start();
+        });
+      }
+
+      // 7. Lag-Free Key Tracking & Camera Management
+      const keys = { w: false, a: false, s: false, d: false };
+      let isFirstPerson = false;
+      let isFreeCamera = false;
+      let isDragging = false;
+      let lastMouseX = 0;
+      let flagGroup = null;
+
+      // Bottom Instructions HUD overlay
+      const hud = document.createElement('div');
+      hud.style.position = 'absolute';
+      hud.style.bottom = '20px';
+      hud.style.left = '50%';
+      hud.style.transform = 'translateX(-50%)';
+      hud.style.backgroundColor = 'rgba(10, 10, 15, 0.75)';
+      hud.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+      hud.style.borderRadius = '8px';
+      hud.style.padding = '8px 18px';
+      hud.style.color = '#ffffff';
+      hud.style.fontFamily = 'monospace, sans-serif';
+      hud.style.fontSize = '13px';
+      hud.style.letterSpacing = '0.5px';
+      hud.style.pointerEvents = 'none';
+      hud.style.userSelect = 'none';
+      document.body.appendChild(hud);
+
+      function updateHUD() {
+        hud.textContent = `[WASD] Move | [Space] Jump | [P] Plant Flag | [V] AR Visor | [F] Freecam (${isFreeCamera ? 'ACTIVE' : 'OFF'}) | [C] POV (${isFirstPerson ? '1st' : '3rd'})`;
+      }
+      updateHUD();
+
+      window.addEventListener('keydown', (e) => {
+        if (!isGameStarted || isGameOver) return;
+        const k = e.key.toLowerCase();
+        if (k in keys) {
+          keys[k] = true;
+        }
+        // Plant Flag Feature ('P' key)
+        if (e.code === 'KeyP') {
+          if (!flagGroup) {
+            flagGroup = new THREE.Group();
+
+            // White Flagpole
+            const poleGeom = new THREE.CylinderGeometry(0.05, 0.05, 2, 16);
+            const poleMat = new THREE.MeshStandardMaterial({
+              color: '#ffffff',
+              metalness: 0.6,
+              roughness: 0.3,
+            });
+            const pole = new THREE.Mesh(poleGeom, poleMat);
+            pole.castShadow = true;
+            pole.receiveShadow = true;
+            flagGroup.add(pole);
+
+            // Red Cloth Flag
+            const clothGeom = new THREE.PlaneGeometry(0.8, 0.5);
+            const clothMat = new THREE.MeshStandardMaterial({
+              color: '#ff2222',
+              side: THREE.DoubleSide,
+              roughness: 0.7,
+            });
+            const cloth = new THREE.Mesh(clothGeom, clothMat);
+            cloth.position.set(0.4, 0.7, 0);
+            cloth.castShadow = true;
+            flagGroup.add(cloth);
+
+            scene.add(flagGroup);
+          }
+
+          // Position flag at astronaut location and raise so base rests on ground
+          flagGroup.position.copy(astronaut.position);
+          flagGroup.position.y += 1;
+
+          // Win Condition Check: astronaut in direct sunlight AND clear signal to Earth
+          sunDirection.subVectors(sunLight.position, astronaut.position).normalize();
+          sunRaycaster.set(astronaut.position, sunDirection);
+          const sunIntersects = sunRaycaster.intersectObject(terrainMesh);
+
+          earthDirection.subVectors(earthMesh.position, astronaut.position).normalize();
+          earthRaycaster.set(astronaut.position, earthDirection);
+          const earthIntersects = earthRaycaster.intersectObject(terrainMesh);
+
+          if (sunIntersects.length === 0 && earthIntersects.length === 0) {
+            if (successScreen) {
+              successScreen.style.display = 'flex';
+            }
+            isGameOver = true;
+          }
+        }
+        // Toggle AR Visor Wireframe View ('V' key)
+        if (e.code === 'KeyV') {
+          isWireframe = !isWireframe;
+          terrainMesh.material.wireframe = isWireframe;
+        }
+        // Spacebar Low-G Jump Trigger (only when controlling astronaut)
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (!isJumping && !isFreeCamera) {
+            yVelocity = JUMP_STRENGTH;
+            isJumping = true;
+          }
+        }
+        // Toggle Camera POV
+        if (k === 'c' && !isFreeCamera) {
+          isFirstPerson = !isFirstPerson;
+          astronaut.visible = !isFirstPerson;
+          updateHUD();
+        }
+        // Toggle Free Camera Mode
+        if (k === 'f') {
+          isFreeCamera = !isFreeCamera;
+          if (isFreeCamera) {
+            controls.enabled = true;
+            controls.target.copy(astronaut.position);
+            astronaut.visible = true;
+          } else {
+            controls.enabled = false;
+            if (isFirstPerson) {
+              astronaut.visible = false;
+            }
+          }
+          updateHUD();
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        if (k in keys) {
+          keys[k] = false;
+        }
+      });
+
+      // Mouse drag to rotate / steer character view when in character mode
+      window.addEventListener('mousedown', (e) => {
+        if (!isGameStarted || isGameOver || isFreeCamera) return;
+        isDragging = true;
+        lastMouseX = e.clientX;
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isGameStarted || !isDragging || isFreeCamera) return;
+        const dx = e.clientX - lastMouseX;
+        lastMouseX = e.clientX;
+        astronaut.rotation.y -= dx * 0.008;
+      });
+
+      // Reusable vector math helpers
+      const targetQuat = new THREE.Quaternion();
+      const upVector = new THREE.Vector3(0, 1, 0);
+      const moveDirection = new THREE.Vector3();
+      const forwardVec = new THREE.Vector3();
+      const rightVec = new THREE.Vector3();
+
+      // 9. Animation & Physics Movement Loop
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Framerate-independent delta time
+        const delta = clock.getDelta();
+
+        // Slow axial rotation for the Earth in deep space
+        earth.rotation.y += 0.0006;
+
+        // Halt Mechanics: Only update player movement, gravity, and raycasting when game is started and active
+        if (isGameStarted && !isGameOver) {
+          // Only update astronaut WASD movement and gravity when NOT in free camera mode
+          if (!isFreeCamera) {
+            const moveSpeed = 12.0; // units per second
+            const moveDistance = moveSpeed * delta;
+
+            // Camera horizontal forward and right vectors
+            forwardVec.set(
+              astronaut.position.x - camera.position.x,
+              0,
+              astronaut.position.z - camera.position.z
+            ).normalize();
+
+            rightVec.set(-forwardVec.z, 0, forwardVec.x);
+
+            // Calculate Movement along X and Z axes from boolean keys object
+            moveDirection.set(0, 0, 0);
+            if (keys.w) moveDirection.add(forwardVec);
+            if (keys.s) moveDirection.sub(forwardVec);
+            if (keys.a) moveDirection.sub(rightVec);
+            if (keys.d) moveDirection.add(rightVec);
+
+            if (moveDirection.lengthSq() > 0) {
+              moveDirection.normalize();
+              astronaut.position.x += moveDirection.x * moveDistance;
+              astronaut.position.z += moveDirection.z * moveDistance;
+
+              // Smoothly rotate astronaut to face walking direction (character front is -Z)
+              const targetAngle = Math.atan2(moveDirection.x, moveDirection.z) + Math.PI;
+              targetQuat.setFromAxisAngle(upVector, targetAngle);
+              astronaut.quaternion.slerp(targetQuat, Math.min(1, 14 * delta));
+            }
+
+            // Apply Floaty Lunar Gravity & Vertical Velocity
+            yVelocity -= LUNAR_GRAVITY * delta;
+            astronaut.position.y += yVelocity * delta;
+
+            // Terrain Grounding (Raycasting)
+            rayOrigin.set(astronaut.position.x, 250, astronaut.position.z);
+            raycaster.set(rayOrigin, downVector);
+            const groundHits = raycaster.intersectObject(terrainMesh);
+            if (groundHits.length > 0) {
+              const terrainHeight = groundHits[0].point.y;
+              // Snap to ground only when reaching or falling below the terrain
+              if (astronaut.position.y <= terrainHeight) {
+                astronaut.position.y = terrainHeight;
+                yVelocity = 0;
+                isJumping = false;
+              }
+            }
+          }
+
+          // Dynamic Target Tracking: Anchor Sun position and shadow target to astronaut
+          sunLight.target.position.copy(astronaut.position);
+          updateSunPosition();
+
+          // Camera POV & Follow Updates
+          if (!isFreeCamera) {
+            if (isFirstPerson) {
+              // First-Person Mode: Positioned at visor height looking forward
+              const visorOffset = new THREE.Vector3(0, 2.05, -0.3).applyQuaternion(astronaut.quaternion);
+              camera.position.copy(astronaut.position).add(visorOffset);
+
+              const forwardDir = new THREE.Vector3(0, 0, -10).applyQuaternion(astronaut.quaternion);
+              camera.lookAt(camera.position.clone().add(forwardDir));
+            } else {
+              // Dynamic Third-Person Chase Camera:
+              // 1. Calculate ideal target position in world space
+              idealTargetPosition
+                .copy(cameraOffset)
+                .applyQuaternion(astronaut.quaternion)
+                .add(astronaut.position);
+
+              // 2. Smoothly glide towards target position
+              camera.position.lerp(idealTargetPosition, 0.1);
+
+              // 3. Keep astronaut centered on screen
+              camera.lookAt(astronaut.position);
+            }
+          } else {
+            // Free Camera Mode: Update OrbitControls to orbit/pan around terrain
+            controls.update();
+          }
+
+          // Solar Charging & Shadow Raycasting Logic
+          sunDirection.subVectors(sunLight.position, astronaut.position).normalize();
+          sunRaycaster.set(astronaut.position, sunDirection);
+
+          const intersects = sunRaycaster.intersectObject(terrainMesh);
+
+          if (intersects.length > 0) {
+            // Ray hit a crater wall or hill (or Sun is below horizon): astronaut is in shadow
+            battery -= 1.0 * delta;
+          } else {
+            // Clear line-of-sight to the Sun: astronaut recharges via solar panels
+            battery += 5.0 * delta;
+          }
+
+          // Clamp battery within [0, 100]
+          battery = Math.max(0, Math.min(100, battery));
+
+          // Trigger the Game Over: Suit power depleted
+          if (battery <= 0 && !isGameOver) {
+            isGameOver = true;
+            if (gameOverScreen) {
+              gameOverScreen.style.display = 'flex';
+            }
+          }
+
+          if (batteryDisplay) {
+            batteryDisplay.innerText = "Battery: " + Math.round(battery) + "%";
+            if (battery === 0) {
+              batteryDisplay.style.color = '#ff4444';
+            } else {
+              batteryDisplay.style.color = '#ffffff';
+            }
+          }
+
+          // Line-of-Sight Communication Signal Mechanic Tracking Earth
+          earthDirection.subVectors(earthMesh.position, astronaut.position).normalize();
+          earthRaycaster.set(astronaut.position, earthDirection);
+
+          const earthIntersects = earthRaycaster.intersectObject(terrainMesh);
+
+          if (signalDisplay) {
+            if (earthIntersects.length > 0) {
+              // Crater wall or ridge physically blocks line-of-sight to Earth
+              signalDisplay.innerText = "Signal: LOST";
+              signalDisplay.style.color = '#ff4444';
+            } else {
+              // Path to Earth is clear
+              signalDisplay.innerText = "Signal: Strong";
+              signalDisplay.style.color = '#ffffff';
+            }
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // 10. Dynamic resize handler
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
+

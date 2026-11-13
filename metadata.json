@@ -1,0 +1,6 @@
+{
+  "name": "Three.js WebGL Foundation",
+  "description": "Foundational boilerplate for a Three.js 3D web application with scene, perspective camera, WebGLRenderer, animation loop, and resize handling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
